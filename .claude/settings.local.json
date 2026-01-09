@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pushd:*)",
+      "Bash(npx tsc:*)",
+      "Bash(popd)",
+      "Bash(npx expo lint:*)"
+    ]
+  }
+}
