@@ -5,17 +5,14 @@ import { View, ActivityIndicator, StyleSheet } from "react-native";
 
 export default function Index() {
   const router = useRouter();
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded } = useAuth();
 
   useEffect(() => {
     if (!isLoaded) return;
 
-    if (isSignedIn) {
-      router.replace("/(tabs)/home");
-    } else {
-      router.replace("/(auth)/sign-in");
-    }
-  }, [isLoaded, isSignedIn, router]);
+    // Always go to home - let users use the app without signing in
+    router.replace("/(tabs)/home");
+  }, [isLoaded, router]);
 
   // Show loading while checking auth
   return (

@@ -29,6 +29,8 @@ export default function SignInScreen() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [needs2FA, setNeeds2FA] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
 
   const handleSignIn = useCallback(async () => {
     if (!isLoaded) return;
@@ -48,6 +50,13 @@ export default function SignInScreen() {
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         router.replace("/(tabs)/home");
+      } else if (result.status === "needs_second_factor") {
+        // 2FA required - send verification code via email
+        await signIn.prepareSecondFactor({
+          strategy: "email_code",
+        });
+        setNeeds2FA(true);
+        Alert.alert("2FA шаардлагатай", "И-мэйл рүү баталгаажуулах код илгээлээ.");
       } else {
         console.log("Sign in incomplete:", result);
         Alert.alert("Алдаа", "Нэвтрэлт дуусаагүй байна.");
@@ -61,6 +70,35 @@ export default function SignInScreen() {
       setIsLoading(false);
     }
   }, [isLoaded, signIn, setActive, email, password, router]);
+
+  const handleVerify2FA = useCallback(async () => {
+    if (!isLoaded || !verificationCode.trim()) {
+      Alert.alert("Алдаа", "Баталгаажуулах кодоо оруулна уу.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await signIn.attemptSecondFactor({
+        strategy: "email_code",
+        code: verificationCode.trim(),
+      });
+
+      if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId });
+        router.replace("/(tabs)/home");
+      } else {
+        Alert.alert("Алдаа", "Баталгаажуулалт дуусаагүй байна.");
+      }
+    } catch (error: unknown) {
+      console.error("2FA verification error:", error);
+      const clerkError = error as { errors?: { message: string }[] };
+      const message = clerkError.errors?.[0]?.message || "Код буруу байна.";
+      Alert.alert("Алдаа", message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoaded, signIn, setActive, verificationCode, router]);
 
   const handleGoogleSignIn = useCallback(async () => {
     if (!isLoaded) return;
@@ -111,87 +149,136 @@ export default function SignInScreen() {
 
           {/* Form */}
           <View style={styles.form}>
-            <Text style={styles.title}>Нэвтрэх</Text>
+            <Text style={styles.title}>{needs2FA ? "Баталгаажуулалт" : "Нэвтрэх"}</Text>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>И-мэйл</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="name@example.com"
-                placeholderTextColor="#6b6b78"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoComplete="email"
-              />
-            </View>
+            {needs2FA ? (
+              <>
+                <Text style={styles.subtitle}>
+                  {email} хаяг руу илгээсэн кодыг оруулна уу.
+                </Text>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Нууц үг</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="••••••••"
-                placeholderTextColor="#6b6b78"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoComplete="password"
-              />
-            </View>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Баталгаажуулах код</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="123456"
+                    placeholderTextColor="#6b6b78"
+                    value={verificationCode}
+                    onChangeText={setVerificationCode}
+                    keyboardType="number-pad"
+                    autoComplete="one-time-code"
+                  />
+                </View>
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.buttonPressed,
-                isLoading && styles.buttonDisabled,
-              ]}
-              onPress={handleSignIn}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Нэвтрэх</Text>
-              )}
-            </Pressable>
-
-            {/* Divider */}
-            <View style={styles.dividerContainer}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>эсвэл</Text>
-              <View style={styles.divider} />
-            </View>
-
-            {/* OAuth Buttons */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.oauthButton,
-                pressed && styles.buttonPressed,
-                isGoogleLoading && styles.buttonDisabled,
-              ]}
-              onPress={handleGoogleSignIn}
-              disabled={isGoogleLoading}
-            >
-              {isGoogleLoading ? (
-                <ActivityIndicator color="#f5f5f7" />
-              ) : (
-                <>
-                  <Text style={styles.oauthIcon}>G</Text>
-                  <Text style={styles.oauthButtonText}>Google-ээр нэвтрэх</Text>
-                </>
-              )}
-            </Pressable>
-
-            {/* Sign Up Link */}
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>Бүртгэл байхгүй юу? </Text>
-              <Link href="/(auth)/sign-up" asChild>
-                <Pressable>
-                  <Text style={styles.footerLink}>Бүртгүүлэх</Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.primaryButton,
+                    pressed && styles.buttonPressed,
+                    isLoading && styles.buttonDisabled,
+                  ]}
+                  onPress={handleVerify2FA}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Баталгаажуулах</Text>
+                  )}
                 </Pressable>
-              </Link>
-            </View>
+
+                <Pressable
+                  style={styles.backButton}
+                  onPress={() => {
+                    setNeeds2FA(false);
+                    setVerificationCode("");
+                  }}
+                >
+                  <Text style={styles.backButtonText}>Буцах</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>И-мэйл</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="name@example.com"
+                    placeholderTextColor="#6b6b78"
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    autoComplete="email"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Нууц үг</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="••••••••"
+                    placeholderTextColor="#6b6b78"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    autoComplete="password"
+                  />
+                </View>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.primaryButton,
+                    pressed && styles.buttonPressed,
+                    isLoading && styles.buttonDisabled,
+                  ]}
+                  onPress={handleSignIn}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Нэвтрэх</Text>
+                  )}
+                </Pressable>
+
+                {/* Divider */}
+                <View style={styles.dividerContainer}>
+                  <View style={styles.divider} />
+                  <Text style={styles.dividerText}>эсвэл</Text>
+                  <View style={styles.divider} />
+                </View>
+
+                {/* OAuth Buttons */}
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.oauthButton,
+                    pressed && styles.buttonPressed,
+                    isGoogleLoading && styles.buttonDisabled,
+                  ]}
+                  onPress={handleGoogleSignIn}
+                  disabled={isGoogleLoading}
+                >
+                  {isGoogleLoading ? (
+                    <ActivityIndicator color="#f5f5f7" />
+                  ) : (
+                    <>
+                      <Text style={styles.oauthIcon}>G</Text>
+                      <Text style={styles.oauthButtonText}>Google-ээр нэвтрэх</Text>
+                    </>
+                  )}
+                </Pressable>
+
+                {/* Sign Up Link */}
+                <View style={styles.footer}>
+                  <Text style={styles.footerText}>Бүртгэл байхгүй юу? </Text>
+                  <Link href="/(auth)/sign-up" asChild>
+                    <Pressable>
+                      <Text style={styles.footerLink}>Бүртгүүлэх</Text>
+                    </Pressable>
+                  </Link>
+                </View>
+              </>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -247,8 +334,23 @@ const styles = StyleSheet.create({
     color: "#f5f5f7",
     fontSize: 24,
     fontWeight: "700",
-    marginBottom: 24,
+    marginBottom: 12,
     textAlign: "center",
+  },
+  subtitle: {
+    color: "#6b6b78",
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  backButton: {
+    marginTop: 16,
+    alignItems: "center",
+  },
+  backButtonText: {
+    color: "#667eea",
+    fontSize: 14,
+    fontWeight: "600",
   },
   inputContainer: {
     marginBottom: 16,

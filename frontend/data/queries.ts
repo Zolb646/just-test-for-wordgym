@@ -182,6 +182,37 @@ export async function deleteDeck(deckId: string): Promise<boolean> {
   return result.changes > 0;
 }
 
+/**
+ * Import decks from cloud (replaces local data)
+ */
+export async function importDecks(decks: Deck[]): Promise<void> {
+  if (isWeb) {
+    console.log("importDecks: Web platform - not persisted");
+    return;
+  }
+
+  const db = getDatabase();
+
+  // Clear existing data
+  await db.runAsync("DELETE FROM cards");
+  await db.runAsync("DELETE FROM decks");
+
+  // Insert all decks and cards
+  for (const deck of decks) {
+    await db.runAsync(
+      "INSERT INTO decks (id, name, is_favorite, created_at) VALUES (?, ?, ?, ?)",
+      [deck.id, deck.name, deck.isFavorite ? 1 : 0, Date.now()]
+    );
+
+    for (const card of deck.cards) {
+      await db.runAsync(
+        "INSERT INTO cards (id, deck_id, word, translation, last_rating, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        [card.id, deck.id, card.word, card.translation, card.lastRating || null, Date.now()]
+      );
+    }
+  }
+}
+
 // ==================== CARD QUERIES ====================
 
 /**

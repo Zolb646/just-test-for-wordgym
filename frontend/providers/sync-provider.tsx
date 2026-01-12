@@ -5,7 +5,7 @@
 
 import { useEffect, useState, createContext, useContext } from "react";
 import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-expo";
-import { getDecks } from "@/data/store";
+import { getDecks, importDecksFromCloud } from "@/data/store";
 import { getStreakData } from "@/data/queries";
 import {
   setAuthToken,
@@ -116,7 +116,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     const token = await getToken();
     setAuthToken(token);
 
-    return importFromCloud();
+    const result = await importFromCloud();
+
+    // Save imported decks to local database/store
+    if (result.success && result.decks.length > 0) {
+      await importDecksFromCloud(result.decks);
+    }
+
+    return result;
   };
 
   return (

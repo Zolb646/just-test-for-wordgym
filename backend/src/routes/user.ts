@@ -20,21 +20,29 @@ router.post("/sync", requireAuth, async (req, res: Response) => {
 
     const now = Date.now();
 
+    // Helper to filter out undefined values
+    const filterUndefined = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
+      return Object.fromEntries(
+        Object.entries(obj).filter(([_, v]) => v !== undefined)
+      ) as Partial<T>;
+    };
+
     if (userDoc.exists) {
-      // Update existing user
-      await userRef.update({
+      // Update existing user - only update defined fields
+      const updateData = filterUndefined({
         email,
         name,
         imageUrl,
         lastLoginAt: now,
       });
+      await userRef.update(updateData);
     } else {
-      // Create new user
+      // Create new user - use defaults for undefined fields
       const newUser: User = {
         id: authReq.userId,
-        email,
-        name,
-        imageUrl,
+        email: email || "",
+        name: name || "",
+        imageUrl: imageUrl || null,
         createdAt: now,
         lastLoginAt: now,
       };

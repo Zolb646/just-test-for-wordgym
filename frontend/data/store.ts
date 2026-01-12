@@ -261,3 +261,27 @@ export async function deleteCard(deckId: string, cardId: string): Promise<boolea
 export function getDecks(): Deck[] {
   return state.decks;
 }
+
+/**
+ * Import decks from cloud (replaces local data)
+ */
+export async function importDecksFromCloud(decks: Deck[]): Promise<void> {
+  try {
+    await queries.importDecks(decks);
+    state.decks = decks;
+    notify();
+    console.log(`Imported ${decks.length} decks from cloud`);
+  } catch (error) {
+    console.error("Failed to import decks:", error);
+    throw error;
+  }
+}
+
+/**
+ * Clear all decks from store (call after clearing database)
+ */
+export function clearAllDecks(): void {
+  state.decks = [];
+  notify();
+  console.log("Store cleared");
+}

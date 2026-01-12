@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "@/hooks/use-auth";
-import { useStore } from "@/data/store";
+import { useStore, clearAllDecks } from "@/data/store";
 import { clearDatabase } from "@/data/database";
 import { exportDecksOffline } from "@/data/api";
 import { useSyncStatus } from "@/providers/sync-provider";
@@ -232,7 +232,7 @@ export default function SettingsScreen() {
               if (result.success) {
                 Alert.alert(
                   "Амжилттай",
-                  `${result.decks.length} deck татагдлаа. Апп-аа дахин ачаална уу.`
+                  `${result.decks.length} deck татагдлаа.`
                 );
               } else {
                 Alert.alert("Алдаа", result.error || "Татахад алдаа гарлаа.");
@@ -305,6 +305,7 @@ export default function SettingsScreen() {
             setIsClearing(true);
             try {
               await clearDatabase();
+              clearAllDecks();
               Alert.alert("Амжилттай", "Бүх өгөгдөл устгагдлаа.");
             } catch {
               Alert.alert("Алдаа", "Өгөгдөл устгахад алдаа гарлаа.");
